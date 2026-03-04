@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#D4AF37">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <title>Side Bet Wheel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Rye&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at center, #2a0800 0%, #000000 100%);
+            overscroll-behavior-y: none;
+        }
+        
+        .casino-font {
+            font-family: 'Rye', cursive;
+        }
+
+        .wheel-spin {
+            transition-property: transform;
+        }
+
+        .scale-enter-active, .scale-leave-active {
+            transition: all 0.5s ease;
+            z-index: 10;
+        }
+        .scale-enter-from, .scale-leave-to {
+            opacity: 0;
+            transform: scale(0.5);
+        }
+
+        /* Auras */
+        .aura-fire {
+            animation: effect-spin 2s linear infinite, effect-pulse 0.8s alternate infinite ease-in-out;
+            background: conic-gradient(from 0deg, #ff0000, #ff8c00, #ffcd00, #ff4500, #ff0000);
+            filter: blur(15px);
+            opacity: 0.9;
+        }
+        .aura-lightning {
+            animation: effect-spin 2s linear infinite, effect-pulse 0.8s alternate infinite ease-in-out;
+            background: conic-gradient(from 0deg, #0000ff, #00bfff, #00ffff, #00bfff, #0000ff);
+            filter: blur(15px);
+            opacity: 0.9;
+        }
+        .aura-magic {
+            animation: effect-spin 2s linear infinite, effect-pulse 0.8s alternate infinite ease-in-out;
+            background: conic-gradient(from 0deg, #8b5cf6, #c084fc, #e879f9, #c084fc, #8b5cf6);
+            filter: blur(15px);
+            opacity: 0.9;
+        }
+
+        @keyframes effect-spin { 100% { transform: rotate(360deg); } }
+        @keyframes effect-pulse { 
+            0% { transform: scale(0.95); opacity: 0.8; } 
+            100% { transform: scale(1.05); opacity: 1; } 
+        }
+
+        svg {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white h-screen overflow-hidden flex flex-col">
+    <div id="app" class="flex-1 w-full max-w-md mx-auto p-4 flex flex-col justify-center relative">
+        
+        <div class="relative bg-gray-900 border-2 border-yellow-600 rounded-xl p-6 shadow-[0_0_20px_rgba(212,175,55,0.3)] mb-8 flex flex-col items-center justify-center z-20">
+            <button @click="clearWinnings" :disabled="isSpinning" class="absolute left-4 top-4 text-gray-600 hover:text-red-500 transition disabled:opacity-30 disabled:cursor-not-allowed" title="Clear Winnings">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+            </button>
+
+            <div class="flex flex-col items-center w-full">
+                <span class="text-sm text-yellow-500 uppercase font-bold tracking-widest mb-1">Winnings</span>
+                <span class="casino-font text-5xl text-yellow-400 drop-shadow-md text-center leading-none">
+                    {{ Math.floor(totalCoins).toLocaleString() }}
+                </span>
+                
+                <div class="flex gap-2 mt-3 h-6">
+                    <div v-if="currentMultiplier > 1" class="bg-red-600 text-white font-bold px-3 py-1 rounded-full text-xs animate-pulse">
+                        {{ currentMultiplier }}x MULT
+                    </div>
+                    <div v-if="activePointers > 1" class="bg-purple-600 text-white font-bold px-3 py-1 rounded-full text-xs animate-pulse shadow-[0_0_10px_#a855f7]">
+                        {{ activePointers }} POINTERS
+                    </div>
+                </div>
+            </div>
+
+            <button @click="showConfig = true" :disabled="isSpinning" class="absolute right-4 top-4 text-gray-400 hover:text-white transition p-2 disabled:opacity-50">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="relative w-full aspect-square flex-shrink-0 z-0">
+            <div v-if="activeEffect === 'fire' && currentWheel === 'main'" class="absolute inset-[-25px] rounded-full aura-fire z-0"></div>
+            <div v-if="activeEffect === 'electric' && currentWheel === 'main'" class="absolute inset-[-25px] rounded-full aura-lightning z-0"></div>
+            <div v-if="activeEffect === 'magic' && currentWheel === 'main'" class="absolute inset-[-25px] rounded-full aura-magic z-0"></div>
+
+            <div class="absolute inset-0 z-30 pointer-events-none drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)]">
+                <div v-for="(offset, index) in pointerOffsets" :key="index" 
+                     class="absolute inset-0 origin-center transition-all duration-500"
+                     :style="{ transform: `rotate(${offset}deg)` }">
+                    <div class="absolute top-[-20px] left-1/2 -translate-x-1/2 w-[40px] h-[60px]">
+                        <svg viewBox="0 0 40 60" class="w-full h-full">
+                            <path d="M0 0 L40 0 L20 55 Z" fill="#D4AF37" stroke="#FFF" stroke-width="2"/>
+                            <circle cx="20" cy="15" r="5" fill="#000"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <transition name="scale">
+                <div v-if="currentWheel === 'main'" 
+                     class="absolute inset-0 rounded-full border-[6px] border-yellow-600 shadow-[0_0_30px_#000] bg-black z-10">
+                    <svg viewBox="0 0 200 200" 
+                         class="wheel-spin" 
+                         :style="{ 
+                             transform: `rotate(${mainRotation}deg)`,
+                             transition: `transform ${config.spinTime}s cubic-bezier(0.15, 0.85, 0.05, 1)`
+                         }" @click="triggerSpin" :disabled="isSpinning">
+                        <path v-for="(wedge, i) in mainWedges" :key="'path'+i" 
+                              :d="getWedgePath(wedge.startAngle, wedge.endAngle, 100)" 
+                              :fill="highlightedWedges.includes(i) ? '#FFFFFF' : wedge.bgColor" 
+                              :stroke="wedge.bgColor" 
+                              stroke-width="0.5"
+                              class="transition-all duration-300 origin-center"
+                              :class="{ 'brightness-150': highlightedWedges.includes(i) }" />
+                        <text v-for="(wedge, i) in mainWedges" :key="'text'+i"
+                              :transform="`translate(100, 100) rotate(${wedge.midAngle - 90})`"
+                              x="88" dy="0.35em"
+                              text-anchor="end"
+                              :fill="highlightedWedges.includes(i) ? '#000000' : wedge.textColor"
+                              :font-size="wedge.fontSize"
+                              class="transition-all casino-font"
+                              font-weight="bold">
+                            {{ wedge.label }}
+                        </text>
+                        <circle cx="100" cy="100" r="15" fill="#222" stroke="#D4AF37" stroke-width="3"/>
+                    </svg>
+                </div>
+            </transition>
+
+            <transition name="scale">
+                <div v-if="currentWheel === 'upgrade'" 
+                     class="absolute inset-0 rounded-full border-[8px] border-purple-500 shadow-[0_0_40px_rgba(168,85,247,0.8)] bg-black z-10">
+                    <svg viewBox="0 0 200 200" 
+                         class="wheel-spin" 
+                         :style="{ 
+                             transform: `rotate(${upgradeRotation}deg)`,
+                             transition: `transform ${config.spinTime}s cubic-bezier(0.15, 0.85, 0.05, 1)`
+                         }" @click="triggerSpin" :disabled="isSpinning">
+                        <path v-for="(wedge, i) in upgradeWedges" :key="'upath'+i" 
+                              :d="getWedgePath(wedge.startAngle, wedge.endAngle, 100)" 
+                              :fill="wedge.bgColor" 
+                              :stroke="wedge.bgColor" 
+                              stroke-width="0.5" />
+                        <text v-for="(wedge, i) in upgradeWedges" :key="'utext'+i"
+                              :transform="`translate(100, 100) rotate(${wedge.midAngle - 90})`"
+                              x="85" dy="0.35em"
+                              text-anchor="end"
+                              :fill="wedge.textColor"
+                              font-size="12"
+                              class="casino-font drop-shadow-md"
+                              font-weight="bold">
+                            {{ wedge.label }}
+                        </text>
+                        <circle cx="100" cy="100" r="15" fill="#111" stroke="#A855F7" stroke-width="3"/>
+                    </svg>
+                </div>
+            </transition>
+        </div>
+
+        <div class="mt-12 flex justify-center relative z-20">
+            <button @click="triggerSpin" :disabled="isSpinning" 
+                    class="relative group disabled:opacity-50 disabled:cursor-not-allowed">
+                <div class="absolute inset-0 bg-yellow-600 blur-lg opacity-60 group-hover:opacity-100 transition duration-300 rounded-full"></div>
+                <div class="relative bg-gradient-to-b from-yellow-400 to-yellow-700 border-2 border-yellow-200 text-black casino-font text-3xl py-4 px-12 rounded-full shadow-[0_10px_20px_rgba(0,0,0,0.5)] active:transform active:translate-y-1">
+                    {{ spinsRemaining > 1 ? `SPIN (${spinsRemaining})` : 'SPIN' }}
+                </div>
+            </button>
+        </div>
+
+        <div v-if="showConfig" class="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4">
+            <div class="bg-gray-800 border border-gray-600 rounded-xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+                <h2 class="text-2xl casino-font text-yellow-500 mb-4">Wheel Config</h2>
+                
+                <div class="space-y-4 mb-6">
+                    <div class="flex justify-between text-xs text-gray-400 uppercase tracking-wider px-1">
+                        <span>Value</span>
+                        <span>Chance (%)</span>
+                    </div>
+                    
+                    <div v-for="(item, index) in config.values" :key="index" class="flex gap-2 items-center">
+                        <input type="number" v-model.number="item.amount" class="w-1/2 bg-gray-900 border border-gray-700 rounded p-2 text-white outline-none focus:border-yellow-500" placeholder="Amount">
+                        <input type="number" v-model.number="item.chance" class="w-1/3 bg-gray-900 border border-gray-700 rounded p-2 text-white outline-none focus:border-yellow-500">
+                        <button @click="removeConfigValue(index)" class="text-red-500 hover:text-red-400 p-2">✕</button>
+                    </div>
+                    
+                    <button @click="addConfigValue" class="w-full py-2 border border-dashed border-gray-600 rounded text-gray-400 hover:text-white hover:border-gray-400 transition">
+                        + Add Value
+                    </button>
+                </div>
+
+                <div class="border-t border-gray-700 pt-4 mb-4">
+                    <div class="flex justify-between items-center bg-purple-900 bg-opacity-30 p-3 rounded border border-purple-800">
+                        <span class="font-bold text-purple-300">Upgrade Chance</span>
+                        <div class="flex items-center gap-2">
+                            <input type="number" v-model.number="config.upgradeChance" class="w-20 bg-gray-900 border border-purple-600 rounded p-1 text-white text-right outline-none">
+                            <span class="text-gray-400">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-700 pt-4 mb-6">
+                    <div class="flex justify-between items-center bg-gray-900 bg-opacity-50 p-3 rounded border border-gray-600">
+                        <span class="font-bold text-gray-300">Spin Duration</span>
+                        <div class="flex items-center gap-2">
+                            <input type="range" v-model.number="config.spinTime" min="2" max="15" step="1" class="w-24 accent-yellow-500">
+                            <span class="text-yellow-400 w-8 text-right">{{ config.spinTime }}s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-sm text-center mb-4 text-gray-400">
+                    Total Chance: <span :class="totalChance === 100 ? 'text-green-400' : 'text-yellow-400'">{{ totalChance }}%</span>
+                    <br><span class="text-xs opacity-70">(Will auto-normalize if not 100%)</span>
+                </div>
+
+                <button @click="saveConfig" class="w-full bg-yellow-600 hover:bg-yellow-500 text-black font-bold py-3 rounded text-lg transition">
+                    Save & Close
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, reactive, watch, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                // Game State
+                const totalCoins = ref(0);
+                const spinsRemaining = ref(1);
+                const currentMultiplier = ref(1);
+                const activePointers = ref(1);
+                const activeEffect = ref('none'); 
+                const currentWheel = ref('main'); 
+                const isSpinning = ref(false);
+
+                // Highlight & Timing State
+                const highlightedWedges = ref([]);
+                const isShowingResults = ref(false);
+                let resultsTimeout = null;
+                
+                const isUpgradeActive = computed(() => activeEffect.value !== 'none');
+
+                const pointerOffsets = computed(() => {
+                    if (activePointers.value === 1) return [0];
+                    if (activePointers.value === 2) return [-35, 35]; 
+                    if (activePointers.value === 3) return [-40, 0, 40]; 
+                    return [0];
+                });
+
+                const mainRotation = ref(0);
+                const upgradeRotation = ref(0);
+
+                const showConfig = ref(false);
+                const config = reactive({
+                    values: [
+                        { amount: 100, chance: 20 },
+                        { amount: 200, chance: 20 },
+                        { amount: 300, chance: 20 },
+                        { amount: -100, chance: 10 },
+                        { amount: 500, chance: 10 },
+                        { amount: -300, chance: 10 }
+                    ],
+                    upgradeChance: 10,
+                    spinTime: 8
+                });
+
+                onMounted(() => {
+                    const savedConfig = localStorage.getItem('goldCoinWheelConfig');
+                    if (savedConfig) {
+                        try {
+                            const parsed = JSON.parse(savedConfig);
+                            config.values = parsed.values || config.values;
+                            config.upgradeChance = parsed.upgradeChance !== undefined ? parsed.upgradeChance : config.upgradeChance;
+                            config.spinTime = parsed.spinTime !== undefined ? parsed.spinTime : config.spinTime;
+                        } catch (e) {
+                            console.error("Failed to parse config", e);
+                        }
+                    }
+                });
+
+                watch(config, (newVal) => {
+                    localStorage.setItem('goldCoinWheelConfig', JSON.stringify(newVal));
+                }, { deep: true });
+
+                const totalChance = computed(() => {
+                    return config.values.reduce((sum, val) => sum + (val.chance || 0), 0) + (config.upgradeChance || 0);
+                });
+
+                const mainColors = ['#8B0000', '#111111', '#1A5F7A', '#C1121F', '#2C3E50', '#004225', '#4A0404', '#191970'];
+
+                const mainWedges = computed(() => {
+                    let halfValues = config.values.map((v, index) => ({
+                        type: 'value',
+                        label: v.amount.toString(),
+                        value: v.amount,
+                        prob: (v.chance || 0) / 2,
+                        bgColor: mainColors[index % mainColors.length],
+                        textColor: '#FFFFFF'
+                    }));
+                    
+                    let upgradeWedge = {
+                        type: 'upgrade',
+                        label: 'UPGRADE',
+                        value: 'upgrade',
+                        prob: (config.upgradeChance || 0) / 2,
+                        bgColor: '#D4AF37',
+                        textColor: '#000000'
+                    };
+
+                    let halfSequence = [...halfValues];
+                    if (!isUpgradeActive.value) {
+                        halfSequence.push(upgradeWedge);
+                    }
+
+                    let combined = [...halfSequence, ...halfSequence].filter(w => w.prob > 0);
+                    let totalActiveProb = combined.reduce((sum, w) => sum + w.prob, 0);
+                    if (totalActiveProb === 0) totalActiveProb = 100;
+
+                    let currentAngle = 0;
+                    return combined.map((w) => {
+                        let sliceAngle = (w.prob / totalActiveProb) * 360;
+                        let startAngle = currentAngle;
+                        let endAngle = currentAngle + sliceAngle;
+                        currentAngle = endAngle;
+
+                        let calculatedFontSize = Math.max(6, Math.min(18, sliceAngle * 1.1));
+                        if (w.type === 'upgrade') {
+                            calculatedFontSize = Math.min(10, calculatedFontSize); 
+                        }
+
+                        return {
+                            ...w,
+                            startAngle,
+                            endAngle,
+                            midAngle: startAngle + (sliceAngle / 2),
+                            fontSize: calculatedFontSize
+                        };
+                    });
+                });
+
+                const upgradeWedgesData = [
+                    { label: '2 SPINS', type: 'spin', value: 2, bgColor: '#7E22CE' }, 
+                    { label: '+1 PTR',  type: 'ptr',  value: 2, bgColor: '#4C1D95' },
+                    { label: 'x2 MULT', type: 'mult', value: 2, bgColor: '#111111' },
+                    { label: '3 SPINS', type: 'spin', value: 3, bgColor: '#7E22CE' }, 
+                    { label: '+2 PTR',  type: 'ptr',  value: 3, bgColor: '#4C1D95' },
+                    { label: 'x3 MULT', type: 'mult', value: 3, bgColor: '#111111' },
+                ];
+
+                const upgradeWedges = computed(() => {
+                    let currentAngle = 0;
+                    const sliceAngle = 360 / upgradeWedgesData.length;
+                    return upgradeWedgesData.map(w => {
+                        let startAngle = currentAngle;
+                        let endAngle = currentAngle + sliceAngle;
+                        currentAngle = endAngle;
+                        return { ...w, startAngle, endAngle, midAngle: startAngle + (sliceAngle / 2), textColor: '#FFFFFF' };
+                    });
+                });
+
+                const getWedgePath = (startAngle, endAngle, radius) => {
+                    const startRad = (startAngle - 90) * Math.PI / 180;
+                    const endRad = (endAngle - 90) * Math.PI / 180;
+                    const x1 = 100 + radius * Math.cos(startRad);
+                    const y1 = 100 + radius * Math.sin(startRad);
+                    const x2 = 100 + radius * Math.cos(endRad);
+                    const y2 = 100 + radius * Math.sin(endRad);
+                    const largeArcFlag = endAngle - startAngle > 180 ? 1 : 0;
+                    return `M 100 100 L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
+                };
+
+                const clearWinnings = () => totalCoins.value = 0;
+
+                const cleanupMainResults = () => {
+                    isShowingResults.value = false;
+                    highlightedWedges.value = [];
+                    
+                    if (spinsRemaining.value <= 0) {
+                        spinsRemaining.value = 1;
+                        currentMultiplier.value = 1;
+                        activePointers.value = 1;
+                        activeEffect.value = 'none';
+                    }
+                };
+
+                const triggerSpin = () => {
+                    if (isSpinning.value) return;
+
+                    // Skip the 3-second highlight period if clicked early
+                    if (isShowingResults.value) {
+                        clearTimeout(resultsTimeout);
+                        cleanupMainResults();
+                    }
+
+                    isSpinning.value = true;
+                    if (currentWheel.value === 'main') {
+                        spinMainWheel();
+                    } else if (currentWheel.value === 'upgrade') {
+                        spinUpgradeWheel();
+                    }
+                };
+
+                const spinMainWheel = () => {
+                    if (!isUpgradeActive.value && spinsRemaining.value === 1) {
+                        totalCoins.value = 0;
+                    }
+
+                    const stopAngle = Math.random() * 360;
+                    const targetOffset = 360 - stopAngle;
+                    const extraSpins = 360 * Math.max(5, Math.floor(config.spinTime * 1.5));
+                    
+                    const currentMod = mainRotation.value % 360;
+                    let requiredRotation = targetOffset - currentMod;
+                    if (requiredRotation <= 0) requiredRotation += 360;
+
+                    mainRotation.value += requiredRotation + extraSpins;
+
+                    setTimeout(() => {
+                        showMainResults(stopAngle);
+                    }, config.spinTime * 1000);
+                };
+
+                const showMainResults = (stopAngle) => {
+                    highlightedWedges.value = [];
+                    let roundWin = 0;
+                    let hitUpgrade = false;
+
+                    for (let offset of pointerOffsets.value) {
+                        let angleAtPointer = (stopAngle + offset + 360) % 360;
+                        let wedgeIndex = mainWedges.value.findIndex(w => angleAtPointer >= w.startAngle && angleAtPointer < w.endAngle);
+                        
+                        if (wedgeIndex !== -1) {
+                            highlightedWedges.value.push(wedgeIndex);
+                            let wedge = mainWedges.value[wedgeIndex];
+                            if (wedge.type === 'value') {
+                                roundWin += wedge.value;
+                            } else if (wedge.type === 'upgrade') {
+                                hitUpgrade = true;
+                            }
+                        }
+                    }
+
+                    // Instantly apply the winnings and subtract the spin
+                    totalCoins.value += (roundWin * currentMultiplier.value);
+                    spinsRemaining.value -= 1;
+
+                    if (hitUpgrade) {
+                        // Instantly transition to upgrade wheel (no waiting)
+                        highlightedWedges.value = [];
+                        currentWheel.value = 'upgrade';
+                        isSpinning.value = false;
+                    } else {
+                        // Show highlight for 3 seconds before cleaning up effects/spins
+                        isShowingResults.value = true;
+                        isSpinning.value = false;
+
+                        resultsTimeout = setTimeout(() => {
+                            cleanupMainResults();
+                        }, 3000);
+                    }
+                };
+
+                const spinUpgradeWheel = () => {
+                    const stopAngle = Math.random() * 360;
+                    const targetOffset = 360 - stopAngle;
+                    const extraSpins = 360 * Math.max(5, Math.floor(config.spinTime * 1.5));
+                    
+                    const currentMod = upgradeRotation.value % 360;
+                    let requiredRotation = targetOffset - currentMod;
+                    if (requiredRotation <= 0) requiredRotation += 360;
+
+                    upgradeRotation.value += requiredRotation + extraSpins;
+
+                    setTimeout(() => {
+                        showUpgradeResults(stopAngle);
+                    }, config.spinTime * 1000);
+                };
+
+                const showUpgradeResults = (stopAngle) => {
+                    let hitUpgrades = [];
+
+                    for (let offset of pointerOffsets.value) {
+                        let angleAtPointer = (stopAngle + offset + 360) % 360;
+                        let wedgeIndex = upgradeWedges.value.findIndex(w => angleAtPointer >= w.startAngle && angleAtPointer < w.endAngle);
+                        
+                        if (wedgeIndex !== -1) {
+                            hitUpgrades.push(upgradeWedges.value[wedgeIndex]);
+                        }
+                    }
+
+                    // Instantly apply the upgrade properties
+                    let newSpins = 0;
+                    let newMult = 1;
+                    let newPtrs = 1;
+                    let hasElectric = false;
+                    let hasFire = false;
+                    let hasMagic = false;
+
+                    for (let wedge of hitUpgrades) {
+                        if (wedge.type === 'spin') {
+                            newSpins += wedge.value;
+                            hasElectric = true;
+                        } else if (wedge.type === 'mult') {
+                            newMult = Math.max(newMult, wedge.value);
+                            hasFire = true;
+                        } else if (wedge.type === 'ptr') {
+                            newPtrs = Math.max(newPtrs, wedge.value);
+                            hasMagic = true;
+                        }
+                    }
+
+                    spinsRemaining.value = newSpins > 0 ? newSpins : 1;
+                    currentMultiplier.value = newMult;
+                    activePointers.value = newPtrs;
+
+                    if (hasMagic) activeEffect.value = 'magic';
+                    else if (hasFire) activeEffect.value = 'fire';
+                    else if (hasElectric) activeEffect.value = 'electric';
+                    else activeEffect.value = 'none';
+
+                    // Instantly transition back to the main wheel (no waiting)
+                    currentWheel.value = 'main';
+                    isSpinning.value = false;
+                };
+
+                const addConfigValue = () => config.values.push({ amount: 1000, chance: 10 });
+                const removeConfigValue = (idx) => config.values.splice(idx, 1);
+                const saveConfig = () => showConfig.value = false;
+
+                return {
+                    totalCoins, spinsRemaining, currentMultiplier, activePointers, pointerOffsets, activeEffect,
+                    currentWheel, isSpinning, mainRotation, upgradeRotation,
+                    showConfig, config, totalChance, mainWedges, upgradeWedges, highlightedWedges, isShowingResults,
+                    getWedgePath, triggerSpin, clearWinnings, addConfigValue, removeConfigValue, saveConfig
+                };
+            }
+        }).mount('#app');
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('ServiceWorker registered with scope:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('ServiceWorker registration failed:', error);
+                    });
+            });
+        }
+
+    </script>
+</body>
+</html>
