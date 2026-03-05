@@ -263,6 +263,13 @@
                 const highlightedWedges = ref([]);
                 const isShowingResults = ref(false);
                 let resultsTimeout = null;
+
+                const getCryptoRandom = () => {
+                    const randomBuffer = new Uint32Array(1);
+                    window.crypto.getRandomValues(randomBuffer);
+                    // Divide by the maximum possible 32-bit unsigned integer + 1 to return a float between 0 (inclusive) and 1 (exclusive)
+                    return randomBuffer[0] / (0xffffffff + 1);
+                };
                 
                 const isUpgradeActive = computed(() => activeEffect.value !== 'none');
 
@@ -431,7 +438,7 @@
                         totalCoins.value = 0;
                     }
 
-                    const stopAngle = Math.random() * 360;
+                    const stopAngle = getCryptoRandom() * 360;
                     const targetOffset = 360 - stopAngle;
                     const extraSpins = 360 * Math.max(5, Math.floor(config.spinTime * 1.5));
                     
@@ -487,7 +494,7 @@
                 };
 
                 const spinUpgradeWheel = () => {
-                    const stopAngle = Math.random() * 360;
+                    const stopAngle = getCryptoRandom() * 360;
                     const targetOffset = 360 - stopAngle;
                     const extraSpins = 360 * Math.max(5, Math.floor(config.spinTime * 1.5));
                     
