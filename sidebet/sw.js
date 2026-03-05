@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sidebet-wheel-cache-v1';
+const CACHE_NAME = 'sidebet-wheel-cache-v2';
 
 // The core files and CDNs your app needs to run
 const ASSETS_TO_CACHE = [
